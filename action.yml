@@ -94,7 +94,8 @@ runs:
             'source': "${{ inputs.module-file }}",
             'source_path': "${{ inputs.module-source-path }}",
             'variables': variables,
-            'environment_variables': environment_variables
+            'environment_variables': environment_variables,
+            'force': True,
           }
           
           with open('workflow_params.yaml', 'w') as outfile:
@@ -120,9 +121,7 @@ runs:
       with:
         environment-name: ${{ steps.check_if_deployment_exists.outputs.deployment_id }}
         workflow: "reload_terraform_template"
-        parameters-file: 'workflow_params.yaml'
-        force: "true"
-      
+        parameters-file: 'workflow_params.yaml'      
         
     - name: Get Deployment ID
       if: ${{ steps.check_if_deployment_exists.outputs.exists != 'true' }}

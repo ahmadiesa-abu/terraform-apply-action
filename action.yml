@@ -140,7 +140,7 @@ runs:
       id: get_deployment_data
       uses: ahmadiesa-abu/environment-data-action@v1.0
       with:
-          environment-name: ${{ fromJson(steps.get_deployment_id.outputs.packageJson).deployment_id || steps.check_if_deployment_exists.outputs.deployment_id }}
+          environment-name: ${{  steps.check_if_deployment_exists.outputs.deployment_id || fromJson(steps.get_deployment_id.outputs.packageJson).deployment_id }}
         
     - name: get cloud resource plan runtime property
       id: get_terraform_output

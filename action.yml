@@ -1,0 +1,158 @@
+name: Execute Terraform
+description:  execute terraform apply on already created deployment , or create one if not exists.
+branding:
+  icon: cloud
+  color: white
+inputs:
+  environment-name:
+    description: Name of Cloudify environment to create
+    required: true
+  module-file:
+    description: URL/path to Terraform module archive
+    required: true
+  module-source-path:
+    description: path to Terraform module inside the archive
+    required: true
+  variables-file:
+    description: YAML/JSON file containing template variables
+    required: false
+    default: "-"
+  environment-file:
+    description: |
+      YAML/JSON file containing environment variables to pass to the Terraform process
+    required: false
+    default: "-"
+  environment-mapping:
+    description: |
+        A whitespace-delimited list of strings. For each item:
+
+        * If it is of the form `k=v`, then the value of the environment variable `k` is passed
+          as environment variable `v` to Terraform
+        * Otherwise, let the value be `x`; then the environment variable `x` is passed as-is
+          to Terraform
+
+        This effectively passes environment variables, visible to the CI/CD platform,
+        as environment variables to Terraform. Useful, among others, for
+        passing Cloud credentials - stored in the CI/CD platform - to Terraform
+    required: false
+    default: "-"
+  labels:
+    description: |
+      A labels list of the form <key>:<value>,<key>:<value>. 
+      Any comma and colon in <value> must be escaped with \. 
+      The labels’ keys are saved in lowercase.
+    required: false
+    default: "-"
+outputs:
+  terraform-outputs:
+    description: Terraform module outputs
+    value: ${{ steps.get_terraform_output.outputs.data  }}
+runs:
+  using: "composite"
+  steps:
+    - name: Check if environment exists
+      id: check_environment
+      uses: ahmadiesa-abu/environment-data-labels-action@v1.2
+      with:
+          environment-name: ${{ inputs.environment-name }}
+          labels: ${{ inputs.labels }}
+    - name: Set deployment exists
+      id: check_if_deployment_exists
+      shell: python
+      run: |
+        import io
+        import os
+        import json
+        import yaml
+        environments = json.loads(r"""${{steps.check_environment.outputs.environment-data}}""")
+        if len(environments)!=0:
+          print('exists')
+          print ('::set-output name=exists::{0}'.format('true'))
+          print ('::set-output name=deployment_id::{0}'.format(environments[0].get('deployment_id')))
+          
+          variables = "${{ inputs.variables-file }}"
+          if variables not in ['', '-']:
+            if os.path.isfile(variables):
+              with io.open(variables, 'r', encoding='UTF-8') as f:
+                variables = yaml.safe_load(f)
+            else:
+              variables = json.loads(variables)
+          else:
+            variables = ''
+          environment_variables = "${{ inputs.environment-file }}"
+          if environment_variables not in ['', '-']:
+            if os.path.isfile(environment_variables):
+              with io.open(environment_variables, 'r', encoding='UTF-8') as f:
+                environment_variables = yaml.safe_load(f)
+            else:
+              environment_variables = json.loads(environment_variables)
+          else:
+            environment_variables = ''
+            
+          workflow_parms = {
+            'node_ids': ['terraform_module'],
+            'source': "${{ inputs.module-file }}",
+            'source_path': "${{ inputs.module-source-path }}",
+            'variables': variables,
+            'environment_variables': environment_variables
+          }
+          
+          with open('workflow_params.yaml', 'w') as outfile:
+            yaml.dump(workflow_parms, outfile)
+        else:
+          print ('::set-output name=exists::"{0}"'.format(False))
+          
+    - name: Execute Terraform apply
+      if: ${{ steps.check_if_deployment_exists.outputs.exists != 'true' }}
+      id: terraform_apply
+      uses: ahmadiesa-abu/terraform-action@v1.1
+      with:
+          environment-name: ${{ inputs.environment-name }}
+          module-file: ${{ inputs.module-file }}
+          module-source-path: ${{ inputs.module-source-path }}
+          variables-file: ${{ inputs.variables-file }}
+          outputs-file: "env-data.json"
+    
+    - name: Execute Terraform reload workflow
+      if: ${{ steps.check_if_deployment_exists.outputs.exists == 'true' }}
+      id: terraform_plan_wf
+      uses: cloudify-cosmo/execute-workflow-action@v1.1
+      with:
+        environment-name: ${{ steps.check_if_deployment_exists.outputs.deployment_id }}
+        workflow: "reload_terraform_template"
+        parameters-file: 'workflow_params.yaml'
+        force: "true"
+      
+        
+    - name: Get Deployment ID
+      if: ${{ steps.check_if_deployment_exists.outputs.exists != 'true' }}
+      id: get_deployment_id
+      shell: bash
+      run: |
+        content=`cat env-plan-data.json`
+        # the following lines are only required for multi line json
+        content="${content//'%'/'%25'}"
+        content="${content//$'\n'/'%0A'}"
+        content="${content//$'\r'/'%0D'}"
+        # end of optional handling for multi line json
+        echo "::set-output name=packageJson::$content"
+        
+    - name: Get Deployment data
+      id: get_deployment_data
+      uses: ahmadiesa-abu/environment-data-action@v1.0
+      with:
+          environment-name: ${{ fromJson(steps.get_deployment_id.outputs.packageJson).deployment_id || steps.check_if_deployment_exists.outputs.deployment_id }}
+        
+    - name: get cloud resource plan runtime property
+      id: get_terraform_output
+      shell: python
+      run: |
+        import json
+        cli_output = ${{steps.get_deployment_data.outputs.environment-data}}
+        environment_data = json.loads(cli_output)
+        print('pretty_plan {0}'.format(pretty_plan))
+        environment_data = environment_data.replace('%','%25')
+        environment_data = environment_data.replace('\n','%0A')
+        environment_data = environment_data.replace('\r','%0D')
+        print ('::set-output name=data::{0}'.format(environment_data))
+ 

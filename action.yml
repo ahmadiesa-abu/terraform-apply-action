@@ -147,11 +147,6 @@ runs:
       shell: python
       run: |
         import json
-        cli_output = ${{steps.get_deployment_data.outputs.environment-data}}
-        environment_data = json.loads(cli_output)
-        print('pretty_plan {0}'.format(pretty_plan))
-        environment_data = environment_data.replace('%','%25')
-        environment_data = environment_data.replace('\n','%0A')
-        environment_data = environment_data.replace('\r','%0D')
+        environment_data = json.loads(r"""${{steps.get_deployment_data.outputs.environment-data}}""")
         print ('::set-output name=data::{0}'.format(environment_data))
  

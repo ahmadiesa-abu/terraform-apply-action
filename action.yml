@@ -147,6 +147,6 @@ runs:
       shell: python
       run: |
         import json
-        environment_data = json.loads(r"""${{steps.get_deployment_data.outputs.environment-data}}""")
+        environment_data = json.loads(r"""${{steps.get_deployment_data.outputs.environment-data}}""")['outputs']['terraform']
         print ('::set-output name=data::{0}'.format(environment_data))
  

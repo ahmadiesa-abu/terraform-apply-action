@@ -101,7 +101,7 @@ runs:
           with open('workflow_params.yaml', 'w') as outfile:
             yaml.dump(workflow_parms, outfile)
         else:
-          print ('::set-output name=exists::"{0}"'.format(False))
+          print ('::set-output name=exists::{0}'.format('false'))
           
     - name: Execute Terraform apply
       if: ${{ steps.check_if_deployment_exists.outputs.exists != 'true' }}

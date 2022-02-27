@@ -112,6 +112,7 @@ runs:
           module-file: ${{ inputs.module-file }}
           module-source-path: ${{ inputs.module-source-path }}
           variables-file: ${{ inputs.variables-file }}
+          labels: ${{ inputs.labels }}
           outputs-file: "env-data.json"
     
     - name: Execute Terraform reload workflow

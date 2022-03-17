@@ -55,7 +55,7 @@ runs:
   using: "composite"
   steps:
     - name: Check if environment exists
-      if: ${{ inputs.environment-id != '-' }}
+      if: ${{ inputs.environment-id == '-' }}
       id: check_environment
       uses: cloudify-cosmo/environment-data-using-labels-action@v1.2
       with:

@@ -144,7 +144,7 @@ runs:
       id: get_deployment_id
       shell: bash
       run: |
-        content=`cat env-plan-data.json`
+        content=`cat env-data.json`
         # the following lines are only required for multi line json
         content="${content//'%'/'%25'}"
         content="${content//$'\n'/'%0A'}"

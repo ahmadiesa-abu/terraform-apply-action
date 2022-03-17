@@ -55,6 +55,7 @@ runs:
   using: "composite"
   steps:
     - name: Check if environment exists
+      if: ${{ inputs.environment-id != '-' }}
       id: check_environment
       uses: cloudify-cosmo/environment-data-using-labels-action@v1.2
       with:
@@ -68,15 +69,8 @@ runs:
         import os
         import json
         import yaml
-        environments = json.loads(r"""${{steps.check_environment.outputs.environment-data}}""")
-        if len(environments)==0:
-          print ('::set-output name=exists::{0}'.format('false'))
-        elif len(environments)==1:
-          print('exists')
-          print ('::set-output name=exists::{0}'.format('true'))
-          print ('::set-output name=deployment_id::{0}'.format(environments[0].get('deployment_id')))
-          
-          variables = "${{ inputs.variables-file }}"
+        
+        def prepare_parameters_file(variables, environment_variables):
           if variables not in ['', '-']:
             if os.path.isfile(variables):
               with io.open(variables, 'r', encoding='UTF-8') as f:
@@ -85,7 +79,6 @@ runs:
               variables = json.loads(variables)
           else:
             variables = ''
-          environment_variables = "${{ inputs.environment-file }}"
           if environment_variables not in ['', '-']:
             if os.path.isfile(environment_variables):
               with io.open(environment_variables, 'r', encoding='UTF-8') as f:
@@ -103,9 +96,24 @@ runs:
             'environment_variables': environment_variables,
             'force': True,
           }
-          
           with open('workflow_params.yaml', 'w') as outfile:
             yaml.dump(workflow_parms, outfile)
+          
+        
+        deployment_id = ${{ inputs.environment-id }}
+        if deployment_id != '-':
+          print ('::set-output name=exists::{0}'.format('true'))
+          print ('::set-output name=deployment_id::{0}'.format(deployment_id))
+          prepare_parameters_file("${{ inputs.variables-file }}", "${{ inputs.environment-file }}")
+          return
+        environments = json.loads(r"""${{steps.check_environment.outputs.environment-data}}""")
+        if len(environments)==0:
+          print ('::set-output name=exists::{0}'.format('false'))
+        elif len(environments)==1:
+          print('exists')
+          print ('::set-output name=exists::{0}'.format('true'))
+          print ('::set-output name=deployment_id::{0}'.format(environments[0].get('deployment_id')))
+          prepare_parameters_file("${{ inputs.variables-file }}", "${{ inputs.environment-file }}")
         else:
           dep_ids = [dep.get('deployment_id') for dep in environments]
           raise Exception("Your name/labels may refer to these deployments {0} , please specify which one by using enviornemnt-id input".format(dep_ids))

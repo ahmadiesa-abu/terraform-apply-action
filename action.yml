@@ -100,7 +100,7 @@ runs:
             yaml.dump(workflow_parms, outfile)
           
         
-        deployment_id = ${{ inputs.environment-id }}
+        deployment_id = "${{ inputs.environment-id }}"
         if deployment_id != '-':
           print ('::set-output name=exists::{0}'.format('true'))
           print ('::set-output name=deployment_id::{0}'.format(deployment_id))

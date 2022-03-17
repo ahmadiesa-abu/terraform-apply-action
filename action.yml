@@ -105,18 +105,18 @@ runs:
           print ('::set-output name=exists::{0}'.format('true'))
           print ('::set-output name=deployment_id::{0}'.format(deployment_id))
           prepare_parameters_file("${{ inputs.variables-file }}", "${{ inputs.environment-file }}")
-          return
-        environments = json.loads(r"""${{steps.check_environment.outputs.environment-data}}""")
-        if len(environments)==0:
-          print ('::set-output name=exists::{0}'.format('false'))
-        elif len(environments)==1:
-          print('exists')
-          print ('::set-output name=exists::{0}'.format('true'))
-          print ('::set-output name=deployment_id::{0}'.format(environments[0].get('deployment_id')))
-          prepare_parameters_file("${{ inputs.variables-file }}", "${{ inputs.environment-file }}")
         else:
-          dep_ids = [dep.get('deployment_id') for dep in environments]
-          raise Exception("Your name/labels may refer to these deployments {0} , please specify which one by using enviornemnt-id input".format(dep_ids))
+          environments = json.loads(r"""${{steps.check_environment.outputs.environment-data}}""")
+          if len(environments)==0:
+            print ('::set-output name=exists::{0}'.format('false'))
+          elif len(environments)==1:
+            print('exists')
+            print ('::set-output name=exists::{0}'.format('true'))
+            print ('::set-output name=deployment_id::{0}'.format(environments[0].get('deployment_id')))
+            prepare_parameters_file("${{ inputs.variables-file }}", "${{ inputs.environment-file }}")
+          else:
+            dep_ids = [dep.get('deployment_id') for dep in environments]
+            raise Exception("Your name/labels may refer to these deployments {0} , please specify which one by using enviornemnt-id input".format(dep_ids))
           
     - name: Execute Terraform apply
       if: ${{ steps.check_if_deployment_exists.outputs.exists != 'true' }}

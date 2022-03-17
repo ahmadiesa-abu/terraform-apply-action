@@ -164,7 +164,9 @@ runs:
       run: |
         import json
         environment_data = json.loads(r"""${{steps.get_deployment_data.outputs.environment-data}}""")['outputs']['terraform']
-        result = json.dumps(environment_data, sort_keys=True, indent=4).encode('string-escape')
-        
+        result = json.dumps(environment_data, sort_keys=True, indent=4)
+        result = result.replace('%','%25')
+        result = result.replace('\n','%0A')
+        result = result.replace('\r','%0D')
         print ('::set-output name=data::{0}'.format(result))
  

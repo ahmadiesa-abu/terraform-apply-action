@@ -9,6 +9,7 @@ inputs:
     required: true
   environment-id:
     description: Id of Cloudify environment to create
+    default: "-"
     required: false
   module-file:
     description: URL/path to Terraform module archive

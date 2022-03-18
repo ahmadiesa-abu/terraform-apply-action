@@ -89,7 +89,7 @@ runs:
             environment_variables = ''
             
           workflow_parms = {
-            'node_ids': ['terraform_module'],
+            'node_ids': [],
             'source': "${{ inputs.module-file }}",
             'source_path': "${{ inputs.module-source-path }}",
             'variables': variables,

@@ -1,16 +1,23 @@
-name: Execute Terraform
-description:  execute terraform apply on already created deployment , or create one if not exists.
+name: Execute Terraform Environment Apply
+description: Execute a terraform apply on already created environment, or create one if it doesn't exist.
 branding:
   icon: cloud
   color: white
 inputs:
   environment-name:
-    description: Name of Cloudify environment to create
+    description: Name of Cloudify environment to handle terraform apply
     required: true
   environment-id:
-    description: Id of Cloudify environment to create
+    description: Id of Cloudify environment to handle terraform apply
     default: "-"
     required: false
+  labels:
+    description: |
+      A labels list of the form <key>:<value>,<key>:<value>.
+      Any comma and colon in <value> must be escaped with \.
+      The labels’ keys are saved in lowercase.
+    required: false
+    default: "-"
   module-file:
     description: URL/path to Terraform module archive
     required: true
@@ -40,13 +47,6 @@ inputs:
         passing Cloud credentials - stored in the CI/CD platform - to Terraform
     required: false
     default: "-"
-  labels:
-    description: |
-      A labels list of the form <key>:<value>,<key>:<value>. 
-      Any comma and colon in <value> must be escaped with \. 
-      The labels’ keys are saved in lowercase.
-    required: false
-    default: "-"
 outputs:
   terraform-outputs:
     description: Terraform module outputs
@@ -54,14 +54,14 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Check if environment exists
+    - name: Check if Environment exists
       if: ${{ inputs.environment-id == '-' }}
       id: check_environment
       uses: cloudify-cosmo/environment-data-using-labels-action@v1.2
       with:
           environment-name: ${{ inputs.environment-name }}
           labels: ${{ inputs.labels }}
-    - name: Set deployment exists
+    - name: Set Deployment exists
       id: check_if_deployment_exists
       shell: python
       run: |
@@ -69,7 +69,7 @@ runs:
         import os
         import json
         import yaml
-        
+
         def prepare_parameters_file(variables, environment_variables):
           if variables not in ['', '-']:
             if os.path.isfile(variables):
@@ -87,19 +87,23 @@ runs:
               environment_variables = json.loads(environment_variables)
           else:
             environment_variables = ''
-            
+
+          source_path = "${{ inputs.module-source-path }}"
+          if source_path in ['','-']:
+            source_path = '.'
+
           workflow_parms = {
             'node_ids': [],
             'source': "${{ inputs.module-file }}",
-            'source_path': "${{ inputs.module-source-path }}",
+            'source_path': source_path,
             'variables': variables,
             'environment_variables': environment_variables,
             'force': True,
           }
           with open('workflow_params.yaml', 'w') as outfile:
             yaml.dump(workflow_parms, outfile)
-          
-        
+
+
         deployment_id = "${{ inputs.environment-id }}"
         if deployment_id != '-':
           print ('::set-output name=exists::{0}'.format('true'))
@@ -116,8 +120,8 @@ runs:
             prepare_parameters_file("${{ inputs.variables-file }}", "${{ inputs.environment-file }}")
           else:
             dep_ids = [dep.get('deployment_id') for dep in environments]
-            raise Exception("Your name/labels may refer to these deployments {0} , please specify which one by using environment-id input".format(dep_ids))
-          
+            raise Exception("Your name/labels may refer to these deployments {0} , please specify which one using environment-id input".format(dep_ids))
+
     - name: Execute Terraform apply
       if: ${{ steps.check_if_deployment_exists.outputs.exists != 'true' }}
       id: terraform_apply
@@ -129,7 +133,7 @@ runs:
           variables-file: ${{ inputs.variables-file }}
           labels: ${{ inputs.labels }}
           outputs-file: "env-data.json"
-    
+
     - name: Execute Terraform reload workflow
       if: ${{ steps.check_if_deployment_exists.outputs.exists == 'true' }}
       id: terraform_plan_wf
@@ -137,8 +141,8 @@ runs:
       with:
         environment-name: ${{ steps.check_if_deployment_exists.outputs.deployment_id }}
         workflow: "reload_terraform_template"
-        parameters-file: 'workflow_params.yaml'      
-        
+        parameters-file: 'workflow_params.yaml'
+
     - name: Get Deployment ID
       if: ${{ steps.check_if_deployment_exists.outputs.exists != 'true' }}
       id: get_deployment_id
@@ -151,14 +155,14 @@ runs:
         content="${content//$'\r'/'%0D'}"
         # end of optional handling for multi line json
         echo "::set-output name=packageJson::$content"
-        
+
     - name: Get Deployment data
       id: get_deployment_data
       uses: cloudify-cosmo/environment-data-action@v1.2
       with:
           environment-name: ${{  steps.check_if_deployment_exists.outputs.deployment_id || fromJson(steps.get_deployment_id.outputs.packageJson).deployment_id }}
-        
-    - name: get cloud resource plan runtime property
+
+    - name: get terraform module instance runtime properties
       id: get_terraform_output
       shell: python
       run: |
@@ -169,4 +173,3 @@ runs:
         result = result.replace('\n','%0A')
         result = result.replace('\r','%0D')
         print ('::set-output name=data::{0}'.format(result))
- 
